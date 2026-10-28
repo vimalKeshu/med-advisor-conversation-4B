@@ -1,0 +1,93 @@
+schema_version: med_advisor_v7_rl_training
+
+run:
+  name: rl_training_v7_1k_run_1
+  out_dir: outputs/rl_training_v7_1k_run_1
+
+system_message: >-
+  You are Med Advisor, a clear, evidence-aware medical and scientific
+  explainer. Use the native reasoning channel when thinking is enabled, and
+  keep the visible answer self-contained. Give useful general education with
+  calibrated uncertainty. Do not diagnose, prescribe, select patient-specific
+  treatment, provide patient-specific dosing, interpret personal medical data
+  or genetic variants as clinical conclusions, or replace clinician judgment.
+  Escalate emergencies immediately.
+
+scenarios:
+  files:
+    - data/training_1k_balanced.jsonl
+  shuffle_seed: 20260821
+
+rollout:
+  group_size: 8              # K comparable trajectories per scenario
+  concurrent_groups: 16
+  seed0: 1000
+  temperature: 1.0
+  top_p: 1.0
+  top_k: 0                   # 0 and -1 both mean "disabled" in vLLM
+  min_p: 0.0
+  presence_penalty: 0.0
+  max_new_tokens: 8192
+
+vllm:
+  dtype: bfloat16
+  max_model_len: 32768
+  gpu_memory_utilization: 0.95
+  enforce_eager: false
+  enable_prefix_caching: true
+  logprobs_mode: processed_logprobs # default raw_logprobs
+
+simulator:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-v4-flash
+  api_key_env: DEEPSEEK_API_KEY
+  temperature: 0.0           # the environment holds still; only the policy varies
+  max_tokens: 2048
+  timeout: 180
+  max_retries: 2
+
+judge:
+  model: gpt-5.6-luna
+  api_key_env: OPENAI_API_KEY
+  timeout: 180
+  max_retries: 2
+  concurrency: 128
+
+reward:
+  # 1 / (average completion tokens per turn * number of turns)
+  # equals 1 / total generated tokens, including thinking tokens.
+  # Scale gives a modest gradient across typical thinking rollouts (~300-1500
+  # tokens); cap at 0.015 to limit the advantage of exceptionally short outputs.
+  # At 800 tokens the token score is 0.0125; at 1600 it is 0.00625.
+  # The added reward is judged quality multiplied by that token score.
+  token_bonus_scale: 10.0
+  token_bonus_cap: 0.015
+
+train:
+  groups_per_step: 16
+  logprob_temperature: 1.0   
+  kl_beta: 0.0
+  learning_rate: 1.5e-6
+  warmup_steps: 10
+  min_lr_ratio: 0.2
+  betas: [0.9, 0.95]
+  epsilon: 1.0e-8
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  logit_chunk: 2048
+  min_eligible: 2            
+  std_epsilon: 1.0e-6
+  checkpoint_every: 50
+  export_interval: 25
+  save_resume_checkpoint: true
+  max_steps: 250    
+
+model:
+  policy: /workspace/v5-sft-01/step-001585
+  tokenizer: /workspace/v5-sft-01/step-001585
+  reference: /workspace/v5-sft-01/step-001585
+
+sync:
+  host: 127.0.0.1
+  port: 51216

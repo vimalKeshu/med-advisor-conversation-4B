@@ -1,0 +1,74 @@
+model:
+  repository: Qwen/Qwen3-4B
+  revision: 1cfa9a7208912126459214e8b04321603b3df60c
+  tokenizer_revision: 1cfa9a7208912126459214e8b04321603b3df60c
+  attention: flash_attention_2
+  parameter_dtype: float32
+  compute_dtype: bfloat16
+  export_dtype: bfloat16
+  trust_remote_code: false
+  local_files_only: false
+
+data:
+  schema_version: med_advisor_sft_v1
+  cache: cache
+  max_length: 10240
+  progress_every_records: 1000
+  system_message: >-
+    You are Med Advisor, a clear, evidence-aware medical and scientific
+    explainer. Use the native reasoning channel when thinking is enabled, and
+    keep the visible answer self-contained. Give useful general education with
+    calibrated uncertainty. Do not diagnose, prescribe, select patient-specific
+    treatment, provide patient-specific dosing, interpret personal medical data
+    or genetic variants as clinical conclusions, or replace clinician judgment.
+    Escalate emergencies immediately.
+  train:
+    file: data/training_data.jsonl
+    sha256: 5ea7369d50ba2ff82d4eb2558f1ad3cf20f91da21c0827f353153e704c87bbb8
+    records: 14008
+    targets: 50698
+    supervised_tokens: 39556432
+  validation:
+    file: data/validation_data.jsonl
+    sha256: 4aacffae71b1744211bf5773796c42756e6fe1208a310d35ce43849de03a4e50
+    records: 1557
+    targets: 5632
+    supervised_tokens: 4419059
+
+training:
+  seed: 20260915
+  epochs: 1
+  microbatch_size: 1
+  accumulation_steps: 32
+  learning_rate: 1.0e-5
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  log_outlier_grad_norm: 10.0
+  warmup_ratio: 0.03
+  gradient_checkpointing: true
+  # Checkpointed output projection: same token loss, no full sequence x vocabulary tensor.
+  loss_chunk_tokens: 1024
+  num_workers: 2
+  prefetch_factor: 32  # Per worker: up to 64 queued CPU microbatches across two workers.
+  persistent_workers: true
+  pin_memory: true
+  # Optional copy/compute overlap on a separate CUDA stream.
+  cuda_prefetch: false
+  tf32: true
+
+run:
+  device: cuda:0
+  directory: outputs/v5-sft-01
+  resume: false  # Requires an existing resume.pt in this directory; false starts a new run.
+  allow_performance_tuning: true  # Allow supported runtime tuning and validation toggle on resume.
+  validation_enabled: false  # Master switch: skip startup, periodic and final model validation.
+  evaluate_at_start: false
+  validation_batch_size: 16  # Independent of training.microbatch_size; larger batches use more memory.
+  progress_every_seconds: 30
+  evaluate_every_steps: 400
+  first_checkpoint_step: 0  # Disable the one-time early checkpoint; regular/final saves still apply.
+  checkpoint_every_steps: 400
+  export_each_evaluation: true
+  max_shard_size: 5GB

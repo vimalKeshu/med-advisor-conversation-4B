@@ -1,0 +1,7 @@
+transformers==4.57.1
+tokenizers==0.22.2
+huggingface-hub>=0.34.0,<1.0
+safetensors==0.7.0
+PyYAML==6.0.3
+packaging>=24.0
+ninja>=1.11
